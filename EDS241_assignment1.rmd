@@ -1,0 +1,114 @@
+---
+title: "EDS241: Assignment template/example"
+author: "Vincent Thivierge"
+date: '`r format(Sys.time(), "%m/%d/%Y")`'
+output: 
+  pdf_document:
+    toc: false
+    number_sections: yes
+header-includes:
+  - \setlength{\parindent}{1em}
+  - \usepackage{float}
+--- 
+  
+``` {r setup, echo = FALSE, message = FALSE, warning = FALSE}
+
+# set default chunk options
+knitr::opts_chunk$set(fig.width = 4, fig.height = 3, 
+                      echo = TRUE, message = FALSE, warning = FALSE)
+
+
+# load packages
+librarian::shelf("stargazer", "here", "tidyr", "dplyr","stringr", "janitor", 
+           "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "tidyverse", 
+           "patchwork", "estimatr", "gt")
+
+
+options(scipen=999) # not scientific notation
+
+
+```
+
+# Load data
+
+\noindent Reading in the data and selecting the variables of interest
+
+```{r , include=TRUE}
+df <- read_csv(here("data", "CES4.csv")) %>% 
+  clean_names() %>% 
+  select(census_tract, total_population, california_county, low_birth_weight, pm2_5, poverty) %>% 
+  rename(pm25 = pm2_5)
+```
+
+# (a) What is the average concentration of PM2.5 across all census tracts in California?
+
+```{r , include=TRUE}
+avg_pm25 <- mean(df$pm25)
+```
+
+\noindent The average concentration of PM2.5 across all census tracts in California is `r avg_pm25` $\mu g / m^3$
+
+# (b) What county has the highest level of poverty in California?
+
+```{r}
+highest_poverty <- df %>% 
+  filter(poverty == max(df$poverty, na.rm = TRUE))
+
+highest_poverty_county <- highest_poverty$california_county
+```
+
+# (c) Make a histogram depicting the distribution of percent low birth weight and PM2.5.
+
+```{r}
+lbw_plot <- ggplot(df, aes(x = low_birth_weight)) +
+  geom_histogram() +
+  theme_minimal() +
+  labs(x = "Percent low birth weight")
+
+pm25_plot <- ggplot(df, aes(x = pm25)) +
+  geom_histogram() +
+  theme_minimal() +
+  labs(x = "PM2.5")
+
+lbw_plot + pm25_plot
+```
+
+# (d) OLS regression of `low_birth_weight` on `pm25`
+
+```{r}
+model <- lm_robust(low_birth_weight ~ pm25, df)
+
+model %>% summary()
+```
+
+```{r}
+beta1_hat <- model$coefficients[["pm25"]]
+```
+
+```{r , results = 'asis', echo = FALSE}
+# stargazer(model, type = "latex", ci=FALSE, no.space = TRUE, 
+#           header = FALSE, omit = c("Constant"), omit.stat = c("adj.rsq","ser", "f"),
+#           dep.var.labels = c("PM2.5"),
+#           dep.var.caption = c(""),
+#           title = "Percent low birth weight and PM2.5", table.placement = "H")
+```
+
+\noindent The estimated slope coefficient is `r beta1_hat`. This tells us that an increase of 1 $\mu g / m^3$ of PM2.5 in a given California census tract is associated with an estimated increase of `r beta1_hat` in the percentage of births in that tract with weight less than 2500g. The effect of `pm25` on `low_birth_weight` *is* significant at the 5% level.
+
+
+# (e) New air quality policy
+
+```{r}
+avg_new_lbw <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * beta1_hat
+
+lbw_ci_low <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model$conf.high[[2]]
+lbw_ci_high <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model$conf.low[[2]]
+```
+
+\noindent The predicted average value of `low_birth_weight` given a reduction of 2 $\mu g / m^3$ of PM2.5 is `r avg_new_lbw`. The 95% confidence interval for this value is `r lbw_ci_low` to `r lbw_ci_high`, which means there is a 95% probability that this interval contains the true population estimate for `low_birth_weight` given a 2 $\mu g / m^3$ reduction in `pm25`
+
+
+
+
+
+
