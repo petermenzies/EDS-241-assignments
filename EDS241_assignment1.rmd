@@ -1,6 +1,6 @@
 ---
-title: "EDS241: Assignment template/example"
-author: "Vincent Thivierge"
+title: "EDS241: Assignment 1"
+author: "Peter Menzies"
 date: '`r format(Sys.time(), "%m/%d/%Y")`'
 output: 
   pdf_document:
@@ -9,9 +9,9 @@ output:
 header-includes:
   - \setlength{\parindent}{1em}
   - \usepackage{float}
---- 
-  
-``` {r setup, echo = FALSE, message = FALSE, warning = FALSE}
+---
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
 
 # set default chunk options
 knitr::opts_chunk$set(fig.width = 4, fig.height = 3, 
@@ -21,12 +21,10 @@ knitr::opts_chunk$set(fig.width = 4, fig.height = 3,
 # load packages
 librarian::shelf("stargazer", "here", "tidyr", "dplyr","stringr", "janitor", 
            "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "tidyverse", 
-           "patchwork", "estimatr", "gt")
+           "patchwork", "estimatr", "car")
 
-
-options(scipen=999) # not scientific notation
-
-
+options(xtable.comment = FALSE)
+# options(scipen=999) # not scientific notation
 ```
 
 # Load data
@@ -76,39 +74,68 @@ lbw_plot + pm25_plot
 # (d) OLS regression of `low_birth_weight` on `pm25`
 
 ```{r}
-model <- lm_robust(low_birth_weight ~ pm25, df)
+model_pm25 <- lm_robust(low_birth_weight ~ pm25, df)
+```
 
-model %>% summary()
+```{r, results='asis', echo=FALSE}
+model_pm25 %>%
+  tidy() %>% 
+  xtable::xtable(digits = 4, caption = "Linear regression of percent low birth weight on PM2.5")
 ```
 
 ```{r}
-beta1_hat <- model$coefficients[["pm25"]]
-```
-
-```{r , results = 'asis', echo = FALSE}
-# stargazer(model, type = "latex", ci=FALSE, no.space = TRUE, 
-#           header = FALSE, omit = c("Constant"), omit.stat = c("adj.rsq","ser", "f"),
-#           dep.var.labels = c("PM2.5"),
-#           dep.var.caption = c(""),
-#           title = "Percent low birth weight and PM2.5", table.placement = "H")
+beta1_hat <- model_pm25$coefficients[["pm25"]]
 ```
 
 \noindent The estimated slope coefficient is `r beta1_hat`. This tells us that an increase of 1 $\mu g / m^3$ of PM2.5 in a given California census tract is associated with an estimated increase of `r beta1_hat` in the percentage of births in that tract with weight less than 2500g. The effect of `pm25` on `low_birth_weight` *is* significant at the 5% level.
-
 
 # (e) New air quality policy
 
 ```{r}
 avg_new_lbw <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * beta1_hat
 
-lbw_ci_low <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model$conf.high[[2]]
-lbw_ci_high <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model$conf.low[[2]]
+lbw_ci_low <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model_pm25$conf.high[[2]]
+lbw_ci_high <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model_pm25$conf.low[[2]]
 ```
 
 \noindent The predicted average value of `low_birth_weight` given a reduction of 2 $\mu g / m^3$ of PM2.5 is `r avg_new_lbw`. The 95% confidence interval for this value is `r lbw_ci_low` to `r lbw_ci_high`, which means there is a 95% probability that this interval contains the true population estimate for `low_birth_weight` given a 2 $\mu g / m^3$ reduction in `pm25`
 
+# (f)
 
+```{r}
+model_pm25_poverty <- lm_robust(low_birth_weight ~ pm25 + poverty, df)
+```
 
+```{r, results='asis', echo=FALSE}
+model_pm25_poverty %>%
+  tidy() %>% 
+  xtable::xtable(digits = 4, caption = "Multiple linear regression of percent low birth weight on PM2.5 and poverty")
+```
 
+\noindent The estimated coefficient on `poverty` signifies that increasing the percentage of the population in the census tract living below twice the federal poverty line by 1% is associated with an estimated increase of `r model_pm25_poverty$coef[["poverty"]]` in `low_birth_weight`.
 
+\noindent The estimated coefficient on `pm25` decreased from `r model_pm25$coefficients[["pm25"]]` in our original single variable model, to `r model_pm25_poverty$coefficients[["pm25"]]` in our multivariate model. This is because `pm25` and `poverty` are correlated (shown below)---and thus in our original model, the estimated coefficient on `pm25` was attempting to explain some of the variation in `low_birth_weight` that our second model shows to be associated with `poverty`.
 
+```{r}
+# showing correlation between pm25 and poverty
+model_endogenous <- lm_robust(pm25 ~ poverty, df)
+```
+
+```{r, results='asis', echo=FALSE}
+model_endogenous %>% 
+  tidy() %>% 
+  xtable::xtable(digits = 4, caption = "Linear regression of PM2.5 on poverty")
+```
+
+# (g) Linear hypothesis test
+
+```{r}
+lht <- linearHypothesis(model_pm25_poverty, "pm25=poverty", white.adjust = "hc2") 
+```
+
+```{r, results='asis', echo=FALSE}
+lht %>% xtable::xtable(digits = 4,
+                       caption = "Comparing effects of PM2.5 and poverty on percent low birth weight")
+```
+
+\noindent Based on the results of our linear hypothesis test, we can reject the null hypothesis that the effects of `pm25` and `poverty` on `low_birth_weight` are equal at the 0.1% level.
