@@ -50,10 +50,16 @@ avg_pm25 <- mean(df$pm25)
 
 ```{r}
 highest_poverty <- df %>% 
-  filter(poverty == max(df$poverty, na.rm = TRUE))
+  group_by(california_county) %>% 
+  mutate(tract_mag = total_population / sum(total_population)) %>% 
+  mutate(weighted_pov = tract_mag * poverty) %>% 
+  summarize("sum_weighted_pov" = sum(weighted_pov, na.rm = TRUE)) %>% 
+  filter(sum_weighted_pov == max(sum_weighted_pov))
 
 highest_poverty_county <- highest_poverty$california_county
 ```
+
+\noindent The county with the highest level of poverty is `r highest_poverty_county`.
 
 # (c) Make a histogram depicting the distribution of percent low birth weight and PM2.5.
 
@@ -88,17 +94,6 @@ beta1_hat <- model_pm25$coefficients[["pm25"]]
 ```
 
 \noindent The estimated slope coefficient is `r beta1_hat`. This tells us that an increase of 1 $\mu g / m^3$ of PM2.5 in a given California census tract is associated with an estimated increase of `r beta1_hat` in the percentage of births in that tract with weight less than 2500g. The effect of `pm25` on `low_birth_weight` *is* significant at the 5% level.
-
-# (e) New air quality policy
-
-```{r}
-avg_new_lbw <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * beta1_hat
-
-lbw_ci_low <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model_pm25$conf.high[[2]]
-lbw_ci_high <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model_pm25$conf.low[[2]]
-```
-
-\noindent The predicted average value of `low_birth_weight` given a reduction of 2 $\mu g / m^3$ of PM2.5 is `r avg_new_lbw`. The 95% confidence interval for this value is `r lbw_ci_low` to `r lbw_ci_high`, which means there is a 95% probability that this interval contains the true population estimate for `low_birth_weight` given a 2 $\mu g / m^3$ reduction in `pm25`
 
 # (f)
 

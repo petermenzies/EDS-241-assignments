@@ -1,0 +1,22 @@
+---
+title: "Assignment 1 working doc"
+author: "Peter Menzies"
+date: "1/20/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# (e) New air quality policy
+
+```{r}
+avg_new_lbw <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * beta1_hat
+
+lbw_ci_low <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model_pm25$conf.high[[2]]
+lbw_ci_high <- mean(df$low_birth_weight, na.rm = TRUE) - 2 * model_pm25$conf.low[[2]]
+```
+
+\noindent The predicted average value of `low_birth_weight` given a reduction of 2 $\mu g / m^3$ of PM2.5 is `r avg_new_lbw`. The 95% confidence interval for this value is `r lbw_ci_low` to `r lbw_ci_high`, which means there is a 95% probability that this interval contains the true population estimate for `low_birth_weight` given a 2 $\mu g / m^3$ reduction in `pm25`
+
