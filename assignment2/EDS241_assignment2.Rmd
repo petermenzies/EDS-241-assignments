@@ -31,21 +31,20 @@ options(xtable.comment = FALSE)
 
 ```{r , include=TRUE}
 df <- read_csv(here("data", "NBP.csv")) %>% 
-  clean_names() %>% 
-  mutate(nbp = as.factor(nbp))
+  clean_names()
 ```
 
 # (a) `dnox_masstons` distribution
 
 ```{r , include=TRUE}
-nox_dist <- ggplot(df, aes(x = dnox_masstons)) +
+dnox_dist <- ggplot(df, aes(x = dnox_masstons)) +
   geom_histogram()
 
-nox_dist
+dnox_dist
 ```
 
 
-# (b) Creating an indicator (`D` = 1) representing PctBlack above the sample median
+# (b) Creating an indicator (`D` = 1) representing `pct_black` above the sample median
 
 ```{r}
 df_D <- df %>% 
@@ -74,17 +73,19 @@ mdl_nbp %>%
   xtable()
 ```
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, results='hide'}
 mdl_nbp %>% summary()
-
-intercept <- mdl_nbp$coefficients[['(Intercept)']]
-nbp1 <- mdl_nbp$coefficients[['nbp1']]
-diff <- abs(nbp1) - abs(intercept)
 ```
 
-\noindent The intercept tells us that counties without NBP in effect saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. The coefficient on `nbp` tells us that counties *with* NBP in effect saw an estimated decrease `r abs(nbp1)` tons *greater than counties without*---this means that counties with NBP saw an estimated decrease of `r abs(intercept) + abs(nbp1)` tons of NOx between 2000 and 2008.
+```{r}
+intercept <- mdl_nbp$coefficients[['(Intercept)']]
+nbp <- mdl_nbp$coefficients[['nbp']]
+```
 
-# (d) Linear regression of `dnox_masstons` on `nbp`, `D`, and `nbp`X`D`
+
+\noindent The intercept tells us that counties *without* NBP in effect saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. The coefficient on `nbp` tells us that counties *with* NBP in effect saw an additional estimated decrease of `r abs(nbp)` tons of NOx between 2000 and 2008 (that is---in addition to the decrease represented by the intercept).
+
+# (d) Linear regression of `dnox_masstons` on `nbp`, `D`, and `nbp` x `D`
 
 ```{r}
 mdl_nbp_D <- lm_robust(dnox_masstons ~ nbp + D + nbp * D, df_D)
@@ -96,62 +97,40 @@ mdl_nbp_D %>%
   xtable()
 ```
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, results='hide'}
 mdl_nbp_D %>% summary()
+```
 
+```{r}
 intercept <- mdl_nbp_D$coefficients[['(Intercept)']]
-nbp1 <- mdl_nbp_D$coefficients[['nbp1']]
+nbp <- mdl_nbp_D$coefficients[['nbp']]
 D <- mdl_nbp_D$coefficients[['D']]
-nbp1_x_D <- mdl_nbp_D$coefficients[['nbp1:D']]
-diff <- abs(intercept) - abs(D)
+nbp_x_D <- mdl_nbp_D$coefficients[['nbp:D']]
 ```
-\noindent The intercept tells us that counties without NBP in effect *and* with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. 
 
-\noindent The coefficient on `nbp` tells us that a county *with* NBP in effect *and* with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(nbp1)` tons of NOx in the total change in NOx between 2000 and 2008. Counties that meet these criteria saw a total estimated decrease of `r abs(nbp1) + abs(intercept)` (coefficient on `nbp` + `intercept`) tons of NOx between 2000 and 2008. 
+\noindent The intercept tells us that counties *without* NBP in effect *and* with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. 
 
-\noindent The coefficient on `D` tells us that a county *without* NBP in effect *and* a `pct_black` greater than the median saw an estimated decrease of `r abs(D) + abs(intercept` (intercept + coefficient on `D`) tons of NOx between 2000 and 2008.
+\noindent The coefficient on `nbp` tells us that a county *with* NBP in effect *and* with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(nbp)` tons of NOx in the total change in NOx between 2000 and 2008.
 
-\noindent The coefficient on the interaction between `nbp` and `D` represents an increase of `r nbp_x_D` tons in the total change in NOx between 2000 and 2008 in counties *with* NBP in effect *and* `pct_black` greater than the median.  
+\noindent The coefficient on `D` tells us that a county *without* NBP in effect *and* a `pct_black` greater than the median saw an estimated decrease of `r abs(D)` tons of NOx in the total change in NOx between 2000 and 2008.
+
+\noindent The coefficient on the interaction between `nbp` and `D` represents an increase of `r nbp_x_D` tons of NOx in the total change in NOx (in addition to the estimated change associated with the other two coefficients) between 2000 and 2008 in counties *with* NBP in effect *and* `pct_black` greater than the median.
 
 
 
-# (f) Regression of low birth weight on PM2.5 and poverty
+# (e) Predicted `dnox_masstons` in a county without NBP in effect and where `pct_black` is above the sample median
 
 ```{r}
-model_pm25_poverty <- lm_robust(low_birth_weight ~ pm25 + poverty, df)
+x_vals <- tribble(~nbp, ~D,
+                    0,   1)
+
+pred_dnox <- predict(mdl_nbp_D,
+                     newdata = x_vals,
+                     se.fit = TRUE,
+                     interval = 'confidence')
 ```
 
-```{r, results='asis', echo=FALSE}
-model_pm25_poverty %>%
-  tidy() %>% 
-  xtable(digits = 4,
-         caption = "Multiple linear regression of percent low birth weight on PM2.5 and poverty")
-```
+The predicted `dnox_masstons` in a county without NBP in effect and where `pct_black` is above the sample median is `r pred_dnox$fit[1]` tons of NOx. The 95% confidence interval for this prediction ranges from `r pred_dnox$fit[2]` to `r pred_dnox$fit[3]`.
 
-\noindent The estimated coefficient on poverty signifies that increasing the percentage of the population in the census tract living below twice the federal poverty line by 1% is associated with an estimated increase of `r model_pm25_poverty$coef[["poverty"]]` in low birth weight.
 
-\noindent The estimated coefficient on PM2.5 decreased from `r model_pm25$coefficients[["pm25"]]` in our original single variable model, to `r model_pm25_poverty$coefficients[["pm25"]]` in our multivariate model. This is because PM2.5 and poverty are correlated (shown below)---and thus in our original model, the estimated coefficient on PM2.5 was attempting to explain some of the variation in low birth weight that our second model shows to be associated with poverty.
 
-```{r}
-# showing correlation between pm25 and poverty
-model_endogenous <- lm_robust(pm25 ~ poverty, df)
-```
-
-```{r, results='asis', echo=FALSE}
-model_endogenous %>% 
-  tidy() %>% 
-  xtable(digits = 4, caption = "Linear regression of PM2.5 on poverty")
-```
-
-# (g) Linear hypothesis test
-
-```{r}
-lht <- linearHypothesis(model_pm25_poverty, "pm25=poverty", white.adjust = "hc2") 
-```
-
-```{r, results='asis', echo=FALSE}
-lht %>% xtable(digits = 4,
-               caption = "Comparing effects of PM2.5 and poverty on percent low birth weight")
-```
-
-\noindent Based on the results of our linear hypothesis test, we can reject the null hypothesis that the effects of PM2.5 and poverty on low birth weight are equal at the 0.1% level.
