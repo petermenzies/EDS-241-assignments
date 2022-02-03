@@ -21,7 +21,7 @@ knitr::opts_chunk$set(fig.width = 4, fig.height = 3,
 # load packages
 librarian::shelf("stargazer", "here", "tidyr", "dplyr","stringr", "janitor", 
            "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "tidyverse", 
-           "patchwork", "estimatr", "car", "xtable")
+           "patchwork", "estimatr", "car", "xtable", "readxl")
 
 options(xtable.comment = FALSE)
 # options(scipen=999) # not scientific notation
@@ -30,7 +30,7 @@ options(xtable.comment = FALSE)
 # Reading in data
 
 ```{r , include=TRUE}
-df <- read_csv(here("data", "NBP.csv")) %>% 
+df <- read_excel(here("data", "NBP.xls")) %>% 
   clean_names()
 ```
 
@@ -110,11 +110,11 @@ nbp_x_D <- mdl_nbp_D$coefficients[['nbp:D']]
 
 \noindent The intercept tells us that counties *without* NBP in effect *and* with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. 
 
-\noindent The coefficient on `nbp` tells us that a county *with* NBP in effect *and* with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(nbp)` tons of NOx in the total change in NOx between 2000 and 2008.
+\noindent The coefficient on `nbp` represents the difference in change in NOx in counties with and without `nbp` in effect that have `pct_black` lower than the median.
 
-\noindent The coefficient on `D` tells us that a county *without* NBP in effect *and* a `pct_black` greater than the median saw an estimated decrease of `r abs(D)` tons of NOx in the total change in NOx between 2000 and 2008.
+\noindent The coefficient on `D` represents the difference in change in NOx in counties without `nbp` in effect with `pct_black` higher than median and `pct_black` lower than median.
 
-\noindent The coefficient on the interaction between `nbp` and `D` represents an increase of `r nbp_x_D` tons of NOx in the total change in NOx (in addition to the estimated change associated with the other two coefficients) between 2000 and 2008 in counties *with* NBP in effect *and* `pct_black` greater than the median.
+\noindent The coefficient on the interaction between `nbp` and `D` represents the difference in effect on NOx of `nbp` in counties with `pct_black` higher than median and counties with `pct_black` lower than median. 
 
 
 
