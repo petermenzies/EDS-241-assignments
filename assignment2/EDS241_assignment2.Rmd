@@ -21,7 +21,7 @@ knitr::opts_chunk$set(fig.width = 4, fig.height = 3,
 # load packages
 librarian::shelf("stargazer", "here", "tidyr", "dplyr","stringr", "janitor", 
            "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "tidyverse", 
-           "patchwork", "estimatr", "car", "xtable", "readxl")
+            "estimatr", "car", "xtable", "readxl")
 
 options(xtable.comment = FALSE)
 # options(scipen=999) # not scientific notation
@@ -59,7 +59,8 @@ df_D1 <- df_D %>%
 avg_pct_D1 <- mean(df_D1$pct_black)
 ```
 
-\noindent The average of `pct_black` for counties above the median is `r avg_pct_D1`
+\noindent The average `pct_black` for counties above the median is `r avg_pct_D1`
+
 
 # (c) Regression of `dnox_masstons` on `nbp`
 
@@ -77,13 +78,15 @@ mdl_nbp %>%
 mdl_nbp %>% summary()
 ```
 
-```{r}
+```{r, echo=FALSE}
 intercept <- mdl_nbp$coefficients[['(Intercept)']]
 nbp <- mdl_nbp$coefficients[['nbp']]
 ```
 
 
-\noindent The intercept tells us that counties *without* NBP in effect saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. The coefficient on `nbp` tells us that counties *with* NBP in effect saw an additional estimated decrease of `r abs(nbp)` tons of NOx between 2000 and 2008 (that is---in addition to the decrease represented by the intercept).
+\noindent The intercept represents the estimated decrease in tons of NOx between 2000 and 2008 in counties without `nbp` in effect.
+
+\noindent The coefficient on `nbp` represents the estimated difference in change in tons of NOx between counties with `nbp` in effect and without `nbp` in effect between 2000 and 2008.
 
 # (d) Linear regression of `dnox_masstons` on `nbp`, `D`, and `nbp` x `D`
 
@@ -101,20 +104,20 @@ mdl_nbp_D %>%
 mdl_nbp_D %>% summary()
 ```
 
-```{r}
+```{r, echo=FALSE}
 intercept <- mdl_nbp_D$coefficients[['(Intercept)']]
 nbp <- mdl_nbp_D$coefficients[['nbp']]
 D <- mdl_nbp_D$coefficients[['D']]
 nbp_x_D <- mdl_nbp_D$coefficients[['nbp:D']]
 ```
 
-\noindent The intercept tells us that counties *without* NBP in effect *and* with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. 
+\noindent The intercept tells us that counties without `nbp` in effect and with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. 
 
-\noindent The coefficient on `nbp` represents the difference in change in NOx in counties with and without `nbp` in effect that have `pct_black` lower than the median.
+\noindent The coefficient on `nbp` represents the estimated difference in change in tons of NOx in counties with `nbp` in effect and without `nbp` in effect that both have `pct_black` lower than the median.
 
-\noindent The coefficient on `D` represents the difference in change in NOx in counties without `nbp` in effect with `pct_black` higher than median and `pct_black` lower than median.
+\noindent The coefficient on `D` represents the estimated difference in change in tons of NOx in counties with `pct_black` higher than median and `pct_black` lower than median both without `nbp` in effect.
 
-\noindent The coefficient on the interaction between `nbp` and `D` represents the difference in effect on NOx of `nbp` in counties with `pct_black` higher than median and counties with `pct_black` lower than median. 
+\noindent The coefficient on the interaction between `nbp` and `D` represents the estimated difference in change in tons of NOx associated with implementation of `nbp` in counties with `pct_black` higher than median and counties with `pct_black` lower than median. 
 
 
 
