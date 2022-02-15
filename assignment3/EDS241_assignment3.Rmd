@@ -1,0 +1,149 @@
+---
+title: "EDS241: Assignment 3"
+author: "Peter Menzies"
+date: '`r format(Sys.time(), "%m/%d/%Y")`'
+output: 
+  pdf_document:
+    toc: false
+    number_sections: no
+header-includes:
+  - \setlength{\parindent}{1em}
+  - \usepackage{float}
+---
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+
+# set default chunk options
+knitr::opts_chunk$set(fig.width = 4, fig.height = 3, 
+                      echo = TRUE, message = FALSE, warning = FALSE)
+
+
+# load packages
+librarian::shelf("stargazer", "here", "tidyr", "dplyr","stringr", "janitor", 
+           "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "tidyverse", 
+            "estimatr", "car", "xtable", "readxl")
+
+options(xtable.comment = FALSE)
+# options(scipen=999) # not scientific notation
+```
+
+# Reading in data
+
+```{r , include=TRUE}
+df <- read_csv(here("data", "SMOKING_EDS241.csv")) %>% 
+  clean_names()
+```
+
+# (a) Mean difference in birth weight of infants with smoking and nonsmoking mothers
+
+```{r , include=TRUE}
+df_wt_diff <- df %>% 
+  group_by(tobacco) %>% 
+  summarize(mean_wt = mean(birthwgt))
+
+wt_diff <- df_wt_diff$mean_wt[df_wt_diff$tobacco == 0] - df_wt_diff$mean_wt[df_wt_diff$tobacco == 1]
+```
+
+```{r}
+lm_robust(alcohol ~ tobacco, df)
+lm_robust(birthwgt ~ alcohol, df)
+```
+
+\noindent The unadjusted mean difference in birth weight of infants with smoking and nonsmoking mothers is `r wt_diff`.
+
+\noindent This would correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight under the hypothesis that
+
+
+# (b) Creating an indicator (`D` = 1) representing `pct_black` above the sample median
+
+```{r}
+df_D <- df %>% 
+  mutate("D" = case_when(
+    pct_black > median(pct_black) ~ 1,
+    pct_black <= median(pct_black) ~ 0
+  ))
+
+df_D1 <- df_D %>% 
+  filter(D == 1)
+
+avg_pct_D1 <- mean(df_D1$pct_black)
+```
+
+\noindent The average `pct_black` for counties above the median is `r avg_pct_D1`
+
+
+# (c) Regression of `dnox_masstons` on `nbp`
+
+```{r}
+mdl_nbp <- lm_robust(dnox_masstons ~ nbp, df)
+```
+
+```{r, results='asis'}
+mdl_nbp %>% 
+  tidy %>% 
+  xtable()
+```
+
+```{r, echo=FALSE, results='hide'}
+mdl_nbp %>% summary()
+```
+
+```{r, echo=FALSE}
+intercept <- mdl_nbp$coefficients[['(Intercept)']]
+nbp <- mdl_nbp$coefficients[['nbp']]
+```
+
+
+\noindent The intercept represents the estimated decrease in tons of NOx between 2000 and 2008 in counties without `nbp` in effect.
+
+\noindent The coefficient on `nbp` represents the estimated difference in change in tons of NOx between counties with `nbp` in effect and without `nbp` in effect between 2000 and 2008.
+
+# (d) Linear regression of `dnox_masstons` on `nbp`, `D`, and `nbp` x `D`
+
+```{r}
+mdl_nbp_D <- lm_robust(dnox_masstons ~ nbp + D + nbp * D, df_D)
+```
+
+```{r, results='asis'}
+mdl_nbp_D %>% 
+  tidy %>% 
+  xtable()
+```
+
+```{r, echo=FALSE, results='hide'}
+mdl_nbp_D %>% summary()
+```
+
+```{r, echo=FALSE}
+intercept <- mdl_nbp_D$coefficients[['(Intercept)']]
+nbp <- mdl_nbp_D$coefficients[['nbp']]
+D <- mdl_nbp_D$coefficients[['D']]
+nbp_x_D <- mdl_nbp_D$coefficients[['nbp:D']]
+```
+
+\noindent The intercept tells us that counties without `nbp` in effect and with a `pct_black` less than or equal to the median saw an estimated decrease of `r abs(intercept)` tons of NOx between 2000 and 2008. 
+
+\noindent The coefficient on `nbp` represents the estimated difference in change in tons of NOx in counties with `nbp` in effect and without `nbp` in effect that both have `pct_black` lower than the median.
+
+\noindent The coefficient on `D` represents the estimated difference in change in tons of NOx in counties with `pct_black` higher than median and `pct_black` lower than median both without `nbp` in effect.
+
+\noindent The coefficient on the interaction between `nbp` and `D` represents the estimated difference in change in tons of NOx associated with implementation of `nbp` in counties with `pct_black` higher than median and counties with `pct_black` lower than median. 
+
+
+
+# (e) Predicted `dnox_masstons` in a county without NBP in effect and where `pct_black` is above the sample median
+
+```{r}
+x_vals <- tribble(~nbp, ~D,
+                    0,   1)
+
+pred_dnox <- predict(mdl_nbp_D,
+                     newdata = x_vals,
+                     se.fit = TRUE,
+                     interval = 'confidence')
+```
+
+The predicted `dnox_masstons` in a county without NBP in effect and where `pct_black` is above the sample median is `r pred_dnox$fit[1]` tons of NOx. The 95% confidence interval for this prediction ranges from `r pred_dnox$fit[2]` to `r pred_dnox$fit[3]`.
+
+
+
