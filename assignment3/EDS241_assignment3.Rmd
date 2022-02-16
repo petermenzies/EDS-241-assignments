@@ -42,61 +42,96 @@ df_wt_diff <- df %>%
   summarize(mean_wt = mean(birthwgt))
 
 wt_diff <- df_wt_diff$mean_wt[df_wt_diff$tobacco == 0] - df_wt_diff$mean_wt[df_wt_diff$tobacco == 1]
+#wt_tob_ttest <- t.test(df$birthwgt[df$tobacco == 0], df$birthwgt[df$tobacco == 1])
 ```
 
 ```{r}
-lm_robust(alcohol ~ tobacco, df)
-lm_robust(birthwgt ~ alcohol, df)
+t.test(df$alcohol[df$tobacco == 1], df$alcohol[df$tobacco == 0])
 ```
 
-\noindent The unadjusted mean difference in birth weight of infants with smoking and nonsmoking mothers is `r wt_diff`.
+\noindent The unadjusted mean difference in birth weight of infants with smoking and nonsmoking mothers is `r wt_diff` grams.
 
-\noindent This would correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight under the hypothesis that
+\noindent This would correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight under the assumption that the treatment (i.e. smoking) is statistically independent of all control variables. 
+
+\noindent The mean difference in alcohol consumption during pregnancy (one of the control variables) of smoking and non-smoking mothers is statistically different from zero (shown above with a t.test), and thus we can't make the previous assumption.
 
 
-# (b) Creating an indicator (`D` = 1) representing `pct_black` above the sample median
+# (b) Multiple linear regression of birth weight on smoking and control variables
 
 ```{r}
-df_D <- df %>% 
-  mutate("D" = case_when(
-    pct_black > median(pct_black) ~ 1,
-    pct_black <= median(pct_black) ~ 0
-  ))
+mdl_b <- lm_robust(birthwgt ~ ., df)
 
-df_D1 <- df_D %>% 
-  filter(D == 1)
-
-avg_pct_D1 <- mean(df_D1$pct_black)
+mdl_b %>% 
+  starprep() %>% 
+  stargazer()
 ```
 
-\noindent The average `pct_black` for counties above the median is `r avg_pct_D1`
+```{r, include=FALSE}
+mdl_b
+
+coef_b <- mdl_b$coefficients[["tobacco"]]
+se_b <- mdl_b$std.error[["tobacco"]]
+```
 
 
-# (c) Regression of `dnox_masstons` on `nbp`
+
+\noindent The estimated coefficient on tobacco in this model is `r coef_b` +/- `r se_b`
+
+
+# (c) Estimating the effect of maternal smoking on birth weight using exact matching estimator
 
 ```{r}
-mdl_nbp <- lm_robust(dnox_masstons ~ nbp, df)
+df_c <- df %>% 
+  mutate(mage = case_when(mage >= 34 ~ 1,
+                          mage < 34 ~ 0)) %>% 
+  mutate(meduc = case_when(meduc >= 16 ~ 1,
+                           meduc < 16 ~ 0)) %>% 
+  mutate(g = as.factor(paste0(mage, meduc, mblack, alcohol)))
 ```
 
-```{r, results='asis'}
-mdl_nbp %>% 
-  tidy %>% 
-  xtable()
+```{r}
+tia <- df_c %>%
+  group_by(g, tobacco) %>% 
+  summarise(n_obs = n(),
+            mean_wt = mean(birthwgt, na.rm = T)) %>%
+  gather(variables, values, n_obs:mean_wt) %>% 
+  mutate(variables = paste0(variables, "_", tobacco)) %>% 
+  pivot_wider(id_cols = g, names_from = variables, values_from = values) %>% 
+  ungroup() %>% 
+  mutate(wt_diff = mean_wt_1 - mean_wt_0,
+         w_ate = (n_obs_0 + n_obs_1) / (sum(n_obs_0) + sum(n_obs_1)),
+         w_att = n_obs_1 / sum(n_obs_1)) %>% 
+  mutate_if(is.numeric, round, 2)
+
+
+stargazer(tia, summary = FALSE, digits = 2)
+
+
+ate = sum((tia$w_ate) * (tia$wt_diff))
+ate
+
+att = sum((tia$w_att) * (tia$wt_diff))
+att
 ```
 
-```{r, echo=FALSE, results='hide'}
-mdl_nbp %>% summary()
+```{r}
+lm_c <- lm_robust(birthwgt ~ tobacco + g, df_c)
+
+lm_c %>%
+  starprep() %>% 
+  stargazer()
 ```
 
-```{r, echo=FALSE}
-intercept <- mdl_nbp$coefficients[['(Intercept)']]
-nbp <- mdl_nbp$coefficients[['nbp']]
+```{r, include=FALSE}
+lm_est_c <- lm_c$coefficients[["tobacco"]] 
 ```
 
 
-\noindent The intercept represents the estimated decrease in tons of NOx between 2000 and 2008 in counties without `nbp` in effect.
+\noindent The estimated average treatment effect of smoking on birth weight using the exact matching estimator is `r ate` compared with `r lm_est_c` for the analagous linear regression.
 
-\noindent The coefficient on `nbp` represents the estimated difference in change in tons of NOx between counties with `nbp` in effect and without `nbp` in effect between 2000 and 2008.
+
+
+
 
 # (d) Linear regression of `dnox_masstons` on `nbp`, `D`, and `nbp` x `D`
 
