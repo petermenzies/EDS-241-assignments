@@ -122,11 +122,30 @@ att
 lm_c <- lm_robust(birthwgt ~ tobacco + g, df_c)
 ```
 
-```{r, results='asis'}
-lm_c %>%
-  starprep() %>% 
-  stargazer(header = FALSE)
+```{r, results='hide'}
+lm_c$coefficients %>%
+  stargazer(header = FALSE, digits = 2, column.sep.width = "0.5pt")
 ```
+
+\begin{table}[!htbp] \centering 
+  \caption{} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{0.5pt}} ccccccccccccccccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+(Intercept) & tobacco & g0001 & g0010 & g0011 & g0100 & g0101 & g0110 & g0111 \\ 
+\hline \\[-1.8ex] 
+$3,445.87$ & $$-$226.25$ & $$-$63.12$ & $$-$241.84$ & $$-$384.01$ & $37.81$ & $88.51$ & $$-$120.78$ & $$-$219.20$ \\ 
+\\
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+g1000 & g1001 & g1010 & g1011 & g1100 & g1101 & g1110 & g1111 \\
+\hline \\[-1.8ex] 
+$10.36$ & $$-$102.85$ & $$-$251.69$ & $$-$443.86$ & $40.82$ & $26.74$ & $$-$146.19$ & $$-$185.75$$$ \\
+\end{tabular} 
+\end{table} 
+\ 
+
 
 ```{r, include=FALSE}
 lm_est_c <- lm_c$coefficients[["tobacco"]] 
