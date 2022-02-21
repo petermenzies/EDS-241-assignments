@@ -42,24 +42,21 @@ mean_wt_nonsmoking <- mean(df$birthwgt[df$tobacco == 0])
 wt_diff <- mean_wt_nonsmoking - mean_wt_smoking
 ```
 
-```{r}
-mdl_alc <- lm_robust(birthwgt ~ alcohol, df)
+```{r, results='asis'}
+mdl_alc <- lm_robust(alcohol ~ tobacco, df)
 
 mdl_alc %>% 
   tidy() %>% 
   xtable()
 ```
 
-```{r}
-t.test(df$alcohol[df$tobacco == 1], df$alcohol[df$tobacco == 0])
-```
 
 \noindent The unadjusted mean difference in birth weight between infants with mothers who smoked during pregnancy and those with mothers who did not is `r wt_diff` grams.
 
 \noindent This would correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight under the assumption that the treatment (mother smoking during pregnancy) is statistically independent of all relevant baseline characteristics. 
 
 \noindent Evidence against this assumption: 
-\noindent Alcohol use during pregnancy has a significant correlation with birth weight (shown above with a linear regression). The mean difference in alcohol consumption during pregnancy between smoking and non-smoking mothers in our sample is statistically different from zero (shown above with a t-test). Thus we can't make the previous assumption regarding ATE.
+\noindent The mean difference in alcohol consumption during pregnancy between smoking and non-smoking mothers in our sample is statistically different from zero (shown above with a linear regression). Thus we can't make the previous assumption.
 
 
 # (b) Multiple linear regression of birth weight on smoking and all control variables
@@ -84,7 +81,7 @@ se_b <- mdl_b$std.error[["tobacco"]]
 
 
 
-\noindent The estimated coefficient on tobacco in this model is `r coef_b` $\pm$ `r se_b` grams.
+\noindent The estimated coefficient on tobacco in this model is `r coef_b` $\pm$ `r se_b` (SE) grams.
 
 
 # (c) Estimating the effect of maternal smoking on birth weight using exact matching estimator
@@ -178,7 +175,8 @@ ps_wgt <- (df_d$tobacco / eps) + ((1 - df_d$tobacco) / (1 - eps))
 # (e) Using propensity score weighted least squares regression to estimate the effect of maternal smoking on birth weight
 
 ```{r}
-wls_mdl <- lm_robust(birthwgt ~ tobacco, df, weights = ps_wgt)
+wls_mdl <- lm_robust(birthwgt ~ tobacco + mage + mage2 + meduc + mblack + alcohol,
+                      df_d, weights = ps_wgt)
 ```
 
 ```{r, include=FALSE}
