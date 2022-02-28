@@ -1,0 +1,149 @@
+---
+title: "EDS241: Assignment 4"
+author: "Peter Menzies"
+date: '`r format(Sys.time(), "%m/%d/%Y")`'
+output: 
+  pdf_document:
+    toc: false
+    number_sections: no
+header-includes:
+  - \setlength{\parindent}{1em}
+  - \usepackage{float}
+---
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+
+# set default chunk options
+knitr::opts_chunk$set(fig.width = 4, fig.height = 3, 
+                      echo = TRUE, message = FALSE, warning = FALSE)
+
+
+# load packages
+librarian::shelf("stargazer", "here", "tidyr", "dplyr","stringr", "janitor", 
+           "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "tidyverse", 
+            "estimatr", "car", "xtable")
+
+options(xtable.comment = FALSE)
+```
+
+# Reading in data
+
+```{r , include=TRUE}
+df <- read_csv(here("data", "EU_sardines.csv")) %>% 
+  clean_names() %>% 
+  mutate(log_price = log(price_euro_kg),
+         log_volume = log(volume_sold_kg))
+```
+
+# (a) Bivariate regression of `log(volume_sold_kg)` on `log(price_euro_kg)`.
+
+```{r}
+mdl_a <- lm_robust(log_volume ~ log_price, df)
+```
+
+```{r, results='hide'}
+mdl_a %>% summary()
+elast_a <- mdl_a$coefficients["log_price"]
+```
+
+```{r, results='asis'}
+mdl_a %>% 
+  tidy() %>% 
+  xtable()
+```
+
+```{r, results='hide'}
+linearHypothesis(mdl_a, "log_price=-1", white.adjust = "hc2")
+```
+
+```{r, results='asis'}
+linearHypothesis(mdl_a, "log_price=-1", white.adjust = "hc2") %>% 
+  tidy %>% 
+  xtable()
+```
+
+
+\noindent The estimated price elasticity of demand for sardines is `r elast_a`.
+
+\noindent Based on our linear hypothesis test, we can reject the null hypothesis that the price elasticity of demand for sardines is equal to -1 at a p-value of less than 0.001.
+
+
+# (b) Wind speed as an instrumental variable: first-stage regression of `log(price_euro_kg)` on `wind_m_s`
+
+```{r}
+mdl_b <- lm_robust(log_price ~ wind_m_s, df)
+```
+
+```{r, include=FALSE}
+mdl_b %>% summary
+
+coef_wind_b <- mdl_b$coefficients['wind_m_s']
+fstat_b <- mdl_b$fstatistic[1]
+```
+
+```{r, results='asis'}
+mdl_b %>% 
+  tidy() %>% 
+  xtable()
+```
+
+
+
+
+\noindent The estimated coefficient on `wind_m_s` represents the increase of `log(price_euro_kg)` given a 1 m/s increase in wind speed. The coefficient is positive---this makes sense as we would expect fish prices to increase with wind speeds due to higher wind speeds posing challenges for fishing vessels.
+
+\noindent The first stage F-statistic (`r fstat_b`) is greater than 10 and thus `wind_m_s` is a relevant and non-weak instrument.
+
+
+# (c) Two-stage least squares estimator of the price elasticity of demand for sardines using `wind_m_s` as an instrument for `log(price_euro_kg)`
+
+```{r}
+tsls_c <- ivreg(log_volume ~ log_price | wind_m_s, data = df)
+```
+
+```{r, results='hide'}
+elast_c <- tsls_c$coefficients["log_price"]
+tsls_c %>% summary()
+```
+
+
+```{r, results='asis'}
+tsls_c %>% 
+  tidy() %>% 
+  xtable()
+```
+
+
+
+\noindent The estimated price elasticity of demand for sardines based on this TSLS estimator is `r elast_c`.
+
+
+
+# (d) Two-stage least squares estimator of the price elasticity of demand for sardines using `wind_m_s` as an instrument for `log(price_euro_kg)` with fixed effects for `year`, `month`, and `country`.
+
+
+```{r}
+tsls_d <- ivreg(log_volume ~ log_price | wind_m_s +
+                  as.factor(country) + as.factor(year) + as.factor(month), data = df)
+```
+
+
+```{r}
+tsls_d %>% summary()
+```
+
+```{r}
+mdl_d <- lm_robust(log_price ~ wind_m_s + as.factor(country) + as.factor(year) + as.factor(month), df)
+```
+
+```{r}
+mdl_d %>% summary()
+```
+
+
+
+
+
+
+
+
