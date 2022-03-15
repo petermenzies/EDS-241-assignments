@@ -21,7 +21,7 @@ knitr::opts_chunk$set(fig.width = 4, fig.height = 3,
 # load packages
 librarian::shelf("stargazer", "here", "tidyr", "dplyr","stringr", "janitor", 
            "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "tidyverse", 
-            "estimatr", "car", "xtable")
+            "estimatr", "car", "xtable", "AER")
 
 options(xtable.comment = FALSE)
 ```
@@ -53,11 +53,11 @@ mdl_a %>%
 ```
 
 ```{r, results='hide'}
-linearHypothesis(mdl_a, "log_price=-1", white.adjust = "hc2")
+linearHypothesis(mdl_a, "log_price=-1", white.adjust = "hc2", test = "F")
 ```
 
 ```{r, results='asis'}
-linearHypothesis(mdl_a, "log_price=-1", white.adjust = "hc2") %>% 
+linearHypothesis(mdl_a, "log_price=-1", white.adjust = "hc2", test = "F") %>% 
   tidy %>% 
   xtable()
 ```
@@ -65,7 +65,7 @@ linearHypothesis(mdl_a, "log_price=-1", white.adjust = "hc2") %>%
 
 \noindent The estimated price elasticity of demand for sardines is `r elast_a`.
 
-\noindent Based on our linear hypothesis test, we can reject the null hypothesis that the price elasticity of demand for sardines is equal to -1 at a p-value of less than 0.001.
+\noindent Based on our linear hypothesis test, we can reject the null hypothesis that the price elasticity of demand for sardines is equal to -1 with a p-value of less than 0.001.
 
 
 # (b) Wind speed as an instrumental variable: first-stage regression of `log(price_euro_kg)` on `wind_m_s`
@@ -92,7 +92,7 @@ mdl_b %>%
 
 \noindent The estimated coefficient on `wind_m_s` represents the increase of `log(price_euro_kg)` given a 1 m/s increase in wind speed. The coefficient is positive---this makes sense as we would expect fish prices to increase with wind speeds due to higher wind speeds posing challenges for fishing vessels.
 
-\noindent The first stage F-statistic (`r fstat_b`) is greater than 10 and thus `wind_m_s` is a relevant and non-weak instrument.
+\noindent The first stage F-statistic, `r fstat_b`, is greater than 10 and thus `wind_m_s` is a relevant and non-weak instrument.
 
 
 # (c) Two-stage least squares estimator of the price elasticity of demand for sardines using `wind_m_s` as an instrument for `log(price_euro_kg)`
@@ -123,24 +123,37 @@ tsls_c %>%
 
 
 ```{r}
-tsls_d <- ivreg(log_volume ~ log_price | wind_m_s +
-                  as.factor(country) + as.factor(year) + as.factor(month), data = df)
+tsls_d <- ivreg(log_volume ~ log_price + as.factor(country) + as.factor(year) + as.factor(month) |
+                  wind_m_s + as.factor(country) + as.factor(year) + as.factor(month), data = df)
 ```
 
-
-```{r}
+```{r, results='hide', include=FALSE}
 tsls_d %>% summary()
+elast_d <- tsls_d$coefficients['log_price']
 ```
+
+```{r, results='asis'}
+tsls_d %>% 
+  tidy %>% 
+  xtable()
+```
+
 
 ```{r}
-mdl_d <- lm_robust(log_price ~ wind_m_s + as.factor(country) + as.factor(year) + as.factor(month), df)
+mdl_d <- lm_robust(log_price ~ wind_m_s + 
+                     as.factor(country) + 
+                     as.factor(year) + 
+                     as.factor(month), df)
 ```
+
 
 ```{r}
-mdl_d %>% summary()
+fstat_d <- mdl_d$fstatistic[1]
+fstat_d
 ```
 
 
+\noindent The estimated price elasticity based on this TSLS estimator is `r elast_d`. The F-statistic associated with wind as an instrumental variable with fixed effects for country, year, and month is `r fstat_d`, and thus the instruments are considered relevant and non-weak.
 
 
 
