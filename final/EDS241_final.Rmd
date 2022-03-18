@@ -13,7 +13,7 @@ header-includes:
 
 ```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
 
-# set default chunk options
+# set default chunk options 
 knitr::opts_chunk$set(fig.width = 4, fig.height = 3, 
                       echo = TRUE, message = FALSE, warning = FALSE)
 
@@ -23,11 +23,12 @@ librarian::shelf("stargazer", "here", "tidyr", "dplyr","stringr", "janitor",
            "cowplot", "ggplot2", "tinytex", "datasets", "tibble", "tidyverse", 
             "estimatr", "car", "xtable", "AER")
 
-options(xtable.comment = FALSE)
+options(xtable.comment = FALSE,
+        scipen = 4)
 ```
 
 ```{r}
-#simple function to make formatted table
+# quick function to make formatted table
 tablr <- function(obj) {
   
     obj %>%
@@ -67,13 +68,9 @@ tablr(ols_a)
 
 
 
-\noindent The estimated "penalty" in value for houses near the incinerator based on the previous OLS regression is `r penalty_a`..
+\noindent The estimated "penalty" in value for houses near the incinerator based on the above OLS regression is `r penalty_a %>% round(digits = 2)` dollars.
 
-\noindent This estimate does *not* correspond to the causal effect of being near the incinerator on housing values. The regression does not include the other observed determinants of housing value included in the dataset (`age`, `rooms`, `area`, `land`---which are in fact significantly correlated with both `rprice` and `nearinc`), nor does it control for unobserved determinants of housing value---thus the estimator is subject to omitted variable bias and we cannot infer causality. 
-
-alternate answer
-
-\noindent This estimate does *not* correspond to the causal effect of being near the incinerator on housing values. The regression does not include house value prior to construction of the incinerator nor the other observed determinants of housing value included in the dataset (`age`, `rooms`, `area`, `land`---which are in fact significantly correlated with both `rprice` and `nearinc`). Additionally, the regression does not control for unobserved determinants of housing value. The estimator is thus subject to omitted variable bias and we cannot infer causality. 
+\noindent This estimate does *not* correspond to the causal effect of being near the incinerator on housing values. The regression does not include house value prior to construction of the incinerator nor the other observed determinants of housing value included in the dataset (`age`, `rooms`, `area`, `land`---which are in fact significantly correlated with both `rprice` and `nearinc`). Additionally, the regression does not control for unobserved determinants of housing value which may also be unbalanced between treated and non-treated houses. The estimator is thus subject to omitted variable bias and we cannot infer causality.
 
 
 # (b) Provide evidence that the location choice of the incinerator was not “random”, but rather selected on the basis of house values and characteristics.
@@ -85,54 +82,56 @@ df_78 <- df %>%
 
 ```{r}
 ols_b1 <- lm_robust(rprice ~ nearinc, df_78)
-ols_b2 <- lm_robust(land ~ nearinc, df_78)
+ols_b2 <- lm_robust(area ~ nearinc, df_78)
 ols_b3 <- lm_robust(rooms ~ nearinc, df_78)
 ```
 
 ```{r, results='asis'}
 # rprice ~ nearinc
 tablr(ols_b1)
-# age ~ nearinc
+# area ~ nearinc
 tablr(ols_b2)
 # rooms ~ nearinc
 tablr(ols_b3)
 ```
 
 
-\noindent The above regressions show that house value, lot size, and number of rooms all had significant correlations with being near the incinerator prior to its construction, thus it is highly unlikely that the location choice of the incinerator was "random".
+\noindent The above regressions show that house value, house square footage, and number of rooms all had statistically significant correlations with being near the incinerator prior to its construction, thus it is highly unlikely that the location choice of the incinerator was "random".
 
 # (c) Based on the observed differences in (b), explain why the estimate in (a) is likely to be biased downward
 
 
-\noindent As shown in (b), prior to the incinerator's existence, houses near the incinerator location-to-be tended to be lower in value and were more likely to possess characteristics that are correlated with lower value than those not near the incinerator location. This means that our initial regression in (a) is likely to be biased downwards because we did not control for the differences in baseline characteristics that were determinants of house value and were correlated with `nearinc` status, and thus the estimated effect of being near the incinerator is attempting to account for some of those differences.
+\noindent As shown in (b), prior to incinerator construction (and rumors of such), houses near the incinerator location-to-be tended to be lower in value and were less likely to possess characteristics that are highly correlated with higher value than those not near the incinerator location. This means that our initial regression in (a) is likely to be biased downward because we did not control for those imbalances in pre-treatment characteristics, and thus the estimated effect of being near the incinerator is attempting to account for those differences to some extent.
 
 
 # (d) Use a difference-in-differences (DD) estimator to estimate the causal effect of the incinerator on housing values without controlling for house and lot characteristics
 
 ```{r}
-df <- df %>% 
-  mutate("D" = ifelse(year == 1981 & nearinc == 1, 1, 0) %>%
+df <- df %>%
+  # creating diff-in-diffs variable indicating treated AND after construction started
+  mutate("DD" = ifelse(year == 1981 & nearinc == 1, 1, 0) %>%
            as.factor())
 ```
 
 ```{r}
-DD1 <- lm_robust(rprice ~ nearinc + as.factor(year) + D, df)
+DD1 <- lm_robust(rprice ~ nearinc + as.factor(year) + DD, df)
 ```
 
 ```{r, include=FALSE, results='hide'}
 DD1 %>% summary()
-ci_low_e <- DD1$conf.low["D1"]
-ci_high_e <- DD1$conf.high["D1"]
+penalty_d <- DD1$coefficients["DD1"]
+ci_low_e <- DD1$conf.low["DD1"]
+ci_high_e <- DD1$conf.high["DD1"]
 ```
 
-```{r}
+```{r, results='asis'}
 tablr(DD1)
 ```
 
 
 
 ```{r}
-# calculating DD manually (to confirm regression coefficient)
+# calculating diff-in-diffs by hand (just to confirm the above coefficient on DD)
 df_before <- df %>% 
   filter(year == 1978)
 
@@ -148,13 +147,12 @@ mean_c_after <- mean(df_after[df_after$nearinc == 0,]$rprice)
 ```
 
 
-
-**Interpret the magnitude and sign of the estimated DD coefficient**
+The estimated causal effect of the incinerator on housing values without controlling for house and lot characteristics is `r penalty_d  %>% round(digits = 2)` dollars. This represents an estimated *decrease* of `r abs(penalty_d  %>% round(digits = 2))` dollars in housing value for houses near the incinerator after the construction began. The estimated effect is lower in magnitude than that of our initial simple OLS regression which makes sense as we're now employing difference-in-differences in order to control for imbalances in pre-treatment characteristics.
 
 
 # (e) Report the 95% confidence interval for the estimate of the causal effect on the incinerator in (d)
 
-The 95% confidence interval for the estimate of the causal effect of the incinerator in (d) is `r ci_low_e` to `r ci_high_e`.
+The 95% confidence interval for the estimate of the causal effect of the incinerator in (d) is `r ci_low_e %>% round(digits = 2)` to `r ci_high_e %>% round(digits = 3)` (dollars).
 
 
 
@@ -163,15 +161,55 @@ The 95% confidence interval for the estimate of the causal effect of the inciner
 
 
 ```{r}
-DD2 <- lm_robust(rprice ~ nearinc + as.factor(year) + D + land + area + rooms + age, df)
-DD2 %>% summary()
+DD2 <- lm_robust(rprice ~ nearinc + as.factor(year) + DD + land + area + rooms + age, df)
 ```
+
+
+```{r, include=FALSE, results='hide'}
+DD2 %>% summary()
+penalty_f <- DD2$coefficients['DD1']
+```
+
+
+```{r, results='asis'}
+tablr(DD2)
+```
+
+
+When we control for house and lot characteristics, the estimated causal effect of the incinerator on housing value increases in magnitude compared with the prior DD regression---representing a larger estimated decrease in housing value. The estimated causal effect of being near the incinerator in this regression is `r penalty_f  %>% round(digits = 2)` dollars. Additionally, the estimated effect in this regression has a lower p-value than that of (d).
+
+
+```{r, include=FALSE, results='hide'}
+linearHypothesis(DD2, c("land = 0", "age = 0", "rooms = 0", "area = 0"), white.adjust = "hc2", test = "F")
+```
+
+
+```{r, results='asis'}
+linearHypothesis(DD2, c("land = 0", "age = 0", "rooms = 0", "area = 0"),
+                 white.adjust = "hc2", test = "F") %>% 
+  tablr()
+```
+
+
+Based on the above linear hypothesis test, we can reject the null hypothesis that the coefficients on the house and lot characteristics are all jointly equal to 0 with a p-value of less than 0.001.
+
+
+# (g) Calculate by how much did real housing values in the control group change on average between 1978 and 1981.
 
 ```{r}
-linearHypothesis(DD2, c("land = 0", "age = 0", "rooms = 0", "area = 0"), white.adjust = "hc2") 
+mean_c_before <- mean(df_before[df_before$nearinc == 0,]$rprice)
+mean_c_after <- mean(df_after[df_after$nearinc == 0,]$rprice)
+
+mean_change_value <- (mean_c_after - mean_c_before)
 ```
 
 
+Real housing values in the control group increased on average by `r mean_change_value %>% round(digits = 2)` dollars between 1978 and 1981. 
+
+
+# (h) What is the key assumption underlying the causal interpretation of the DD estimator in the context of the incinerator construction in North Andover?
+
+The key assumption underlying the causal interpretation of the DD estimator in the context of the incinerator construction in North Andover is that in the absence of the incinerator, the mean difference in value between houses near the incinerator and those not near the incinerator would remain constant---i.e. the parallel trends assumption. 
 
 
 
